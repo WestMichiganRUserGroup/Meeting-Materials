@@ -1,0 +1,98 @@
+---
+title: 'Bariatric Whole Blood Data'
+output: pdf_document
+---
+
+Code and data will be uploaded to our github repository:
+https://github.com/WestMichiganRUserGroup/Meeting-Materials
+
+R allows '=', '<-',  or '->' for assignment. Most coding standards agree that the left arrow '<-' should be used for assignment, reserving the equals '=' for options. However, neither makes sense when using magrittr pipes and the dplyr functions. John Mount has proposed (http://www.win-vector.com/blog/2016/12/the-case-for-using-in-r/) that using the right arrow ‘->’ operator makes much more sense. I definitely agree.
+
+To see way, let's take a look at a common data wrangling problem. A student came to me with a rather messy data set from SPSS that needed restructuring.
+
+We start with the original data. This data came from a CIS project a student asked for help on. The help was not in the primary project, but just getting the data into R in a useable format. They were given the gene expression data in an SPSS save file.
+
+```{r}
+library(tidyverse)
+library(haven)
+Bariatric <- read_sav("BariatricWholeBloodDataSet.sav")
+names(Bariatric)
+```
+
+```{r}
+head(Bariatric)
+```
+
+The first task is to clean up the variable names. Using gsub and nested function calls it could look something like this.
+```{r}
+# Convert names to S.nnn.pre/post
+gsub("Subject","S.",gsub("presurgery",".pre",gsub("postsurgery",".post",names(Bariatric))))
+```
+
+Using pipes this is much cleaner
+```{r}
+names(Bariatric) %>%
+  gsub("Subject","S.", . ) %>%
+  gsub("presurgery",".pre", . ) %>%
+  gsub("postsurgery",".post", . )
+```
+
+Now changing the names of the Bariatric data frame...
+```{r, eval=FALSE}
+names(Bariatric) <-
+  names(Bariatric) %>%
+  gsub("Subject","S.", . ) %>%
+  gsub("presurgery",".pre", . ) %>%
+  gsub("postsurgery",".post", . )
+```
+
+That seems a bit tortured syntactically. But with the right assignment operator '->' we have the following, making it clear we're taking the names from Bariatric and replacing them with new ones.
+```{r}
+names(Bariatric) %>%
+  gsub("Subject","S.", . ) %>%
+  gsub("presurgery",".pre", . ) %>%
+  gsub("postsurgery",".post", . ) ->
+  names(Bariatric)
+
+names(Bariatric)
+```
+
+Now let's try some data manipulaitons. We'll be using the following:
+* gather: restructure wide to narrow format
+* separate: break string variables apart
+* select: select variables
+
+No pipes conversion
+```{r}
+# Gather into long form
+  select(  
+    separate(
+        gather(Bariatric,
+               key=id, value=response.var,
+               S.004.pre:S.014.post),
+        id,c("junk","subject","prepost")),
+    -junk)
+```
+
+Using pipes is cleaner
+```{r}
+# Gather into long form and save
+Bariatric.new <-
+  Bariatric %>%
+  gather(key=id, value=response.var,
+         S.004.pre:S.014.post) %>%
+  separate(id,c("junk","subject","prepost")) %>%
+  select(-junk)
+```
+
+But that assignment doesn't flow with the pipes. Instead, use a right assignment at the end of the pipe and we see data flowing from Bariatric, through the conversions and into Bariatric.new. 
+```{r}
+# Gather into long form and save
+Bariatric %>%
+  gather(key=id, value=response.var,
+         S.004.pre:S.014.post) %>%
+  slice(1:10) %>%
+  separate(id,c("junk","subject","prepost")) %>%
+  select(-junk) -> 
+  Bariatric.new
+```
